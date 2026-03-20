@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% block title %}{{ freelancer.user.full_name }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+  <!-- Profile Header -->
+  <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mb-6">
+    <div class="flex flex-col sm:flex-row items-start gap-6">
+      <div class="w-24 h-24 rounded-2xl bg-brand-100 border-2 border-brand-200 flex items-center justify-center font-display font-800 text-brand-700 text-4xl flex-shrink-0">
+        {{ freelancer.user.user.first_name|first|upper }}{{ freelancer.user.user.last_name|first|upper }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 class="font-display text-3xl font-700">{{ freelancer.user.full_name }}</h1>
+            <p class="text-xl text-gray-500 mt-1">{{ freelancer.title }}</p>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3">
+            {% if user.is_authenticated and user.profile != freelancer.user %}
+            <a href="{% url 'messaging:start' freelancer.user.pk %}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-semibold text-sm hover:bg-gray-200 transition-colors">
+              <i data-lucide="message-circle" class="w-4 h-4"></i> Message
+            </a>
+            {% endif %}
+            <span class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm
+              {% if freelancer.availability == 'available' %}bg-green-100 text-green-700
+              {% elif freelancer.availability == 'busy' %}bg-amber-100 text-amber-700
+              {% else %}bg-gray-100 text-gray-500{% endif %}">
+              <span class="w-2 h-2 rounded-full bg-current"></span>
+              {{ freelancer.get_availability_display }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="flex flex-wrap gap-5 mt-4">
+          <div class="flex items-center gap-1.5">
+            {% for i in "12345" %}
+              {% if freelancer.rating_avg >= forloop.counter %}<i data-lucide="star" class="w-4 h-4 star-filled fill-current"></i>
+              {% else %}<i data-lucide="star" class="w-4 h-4 star-empty"></i>{% endif %}
+            {% endfor %}
+            <span class="font-semibold text-sm ml-1">{{ freelancer.rating_avg }}/5</span>
+            <span class="text-gray-400 text-sm">({{ reviews|length }} avis)</span>
+          </div>
+          <span class="flex items-center gap-1.5 text-sm text-gray-600">
+            <i data-lucide="check-circle" class="w-4 h-4 text-green-500"></i>
+            {{ freelancer.completed_jobs }} missions complétées
+          </span>
+          <span class="flex items-center gap-1.5 text-sm text-gray-600">
+            <i data-lucide="briefcase" class="w-4 h-4 text-brand-500"></i>
+            {{ freelancer.years_experience }} ans d'expérience
+          </span>
+          <span class="flex items-center gap-1.5 text-sm font-bold text-gray-900">
+            <i data-lucide="clock" class="w-4 h-4 text-brand-500"></i>
+            {{ freelancer.display_rate }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main content -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- About -->
+      {% if freelancer.user.bio %}
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="font-display font-700 text-xl mb-4 flex items-center gap-2">
+          <i data-lucide="user" class="w-5 h-5 text-brand-600"></i> À propos
+        </h2>
+        <p class="text-gray-600 leading-relaxed">{{ freelancer.user.bio }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Skills -->
+      {% if skills %}
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="font-display font-700 text-xl mb-4 flex items-center gap-2">
+          <i data-lucide="zap" class="w-5 h-5 text-brand-600"></i> Compétences
+        </h2>
+        <div class="flex flex-wrap gap-2">
+          {% for fs in skills %}
+          <div class="px-4 py-2 rounded-xl border text-sm flex items-center gap-2
+            {% if fs.level == 'expert' %}bg-brand-50 border-brand-200 text-brand-800
+            {% elif fs.level == 'intermediate' %}bg-gray-50 border-gray-200 text-gray-700
+            {% else %}bg-gray-50 border-gray-100 text-gray-500{% endif %}">
+            <span class="font-semibold">{{ fs.skill.name }}</span>
+            <span class="text-xs opacity-70">{{ fs.get_level_display }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Portfolio -->
+      {% if portfolio %}
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="font-display font-700 text-xl mb-4 flex items-center gap-2">
+          <i data-lucide="layout-grid" class="w-5 h-5 text-brand-600"></i> Portfolio
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {% for item in portfolio %}
+          <div class="rounded-xl border border-gray-100 overflow-hidden hover:border-brand-200 transition-colors">
+            {% if item.image %}
+            <img src="{{ item.image.url }}" alt="{{ item.title }}" class="w-full h-36 object-cover">
+            {% else %}
+            <div class="w-full h-36 bg-gradient-to-br from-brand-50 to-cyan-50 flex items-center justify-center">
+              <i data-lucide="image" class="w-8 h-8 text-brand-300"></i>
+            </div>
+            {% endif %}
+            <div class="p-4">
+              <h4 class="font-semibold text-gray-900">{{ item.title }}</h4>
+              <p class="text-sm text-gray-500 mt-1 line-clamp-2">{{ item.description }}</p>
+              {% if item.url %}
+              <a href="{{ item.url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-brand-600 font-semibold mt-2 hover:text-brand-800">
+                Voir le projet <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Reviews -->
+      {% if reviews %}
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h2 class="font-display font-700 text-xl mb-5 flex items-center gap-2">
+          <i data-lucide="message-square" class="w-5 h-5 text-brand-600"></i> Avis clients
+        </h2>
+        <div class="space-y-5">
+          {% for review in reviews %}
+          <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center font-bold text-brand-700 text-sm">
+                  {{ review.reviewer.full_name|first|upper }}
+                </div>
+                <p class="font-semibold text-sm text-gray-800">{{ review.reviewer.full_name }}</p>
+              </div>
+              <div class="flex items-center gap-1">
+                {% for i in "12345" %}
+                  {% if review.rating >= forloop.counter %}<i data-lucide="star" class="w-3.5 h-3.5 star-filled fill-current"></i>
+                  {% else %}<i data-lucide="star" class="w-3.5 h-3.5 star-empty"></i>{% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            <p class="text-sm text-gray-600">{{ review.comment }}</p>
+            <p class="text-xs text-gray-400 mt-2">{{ review.created_at|date:"d M Y" }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-5">
+      <!-- Pricing card -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <p class="text-3xl font-display font-800 text-gray-900 mb-1">{{ freelancer.display_rate }}</p>
+        <p class="text-sm text-gray-500 mb-5">Taux horaire</p>
+
+        {% if user.is_authenticated and user.profile != freelancer.user %}
+        <a href="{% url 'messaging:start' freelancer.user.pk %}" class="w-full btn-primary text-white font-semibold py-3 rounded-xl shadow flex items-center justify-center gap-2 mb-3">
+          <i data-lucide="message-circle" class="w-4 h-4"></i> Contacter
+        </a>
+        {% elif not user.is_authenticated %}
+        <a href="{% url 'accounts:login' %}" class="w-full btn-primary text-white font-semibold py-3 rounded-xl shadow flex items-center justify-center gap-2">
+          <i data-lucide="log-in" class="w-4 h-4"></i> Se connecter pour contacter
+        </a>
+        {% endif %}
+
+        {% if freelancer.portfolio_url %}
+        <a href="{{ freelancer.portfolio_url }}" target="_blank" rel="noopener" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          <i data-lucide="globe" class="w-4 h-4"></i> Portfolio
+        </a>
+        {% endif %}
+      </div>
+
+      <!-- Info -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        {% if freelancer.user.location %}
+        <div class="flex items-center gap-3 text-sm text-gray-600">
+          <i data-lucide="map-pin" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+          <span>{{ freelancer.user.location }}</span>
+        </div>
+        {% endif %}
+        <div class="flex items-center gap-3 text-sm text-gray-600">
+          <i data-lucide="calendar" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+          <span>Membre depuis {{ freelancer.created_at|date:"M Y" }}</span>
+        </div>
+        {% if freelancer.languages.all %}
+        <div class="flex items-start gap-3 text-sm text-gray-600">
+          <i data-lucide="globe-2" class="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5"></i>
+          <div class="flex flex-wrap gap-1">
+            {% for lang in freelancer.languages.all %}
+            <span class="px-2 py-0.5 rounded-md bg-gray-100 text-xs font-medium">{{ lang.name }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
