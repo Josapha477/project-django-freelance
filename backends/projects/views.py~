@@ -1,0 +1,220 @@
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q
+
+from .models import Project, Proposal
+from .forms import ProjectForm, ProposalForm
+from freelancers.models import SkillCategory, Skill
+
+
+def project_list(request):
+    """List all open projects with filters."""
+    projects = Project.objects.filter(
+        status=Project.Status.OPEN,
+        visibility=Project.Visibility.PUBLIC
+    ).select_related('client', 'client__user')
+    
+    # Filters
+    category = request.GET.get('category')
+    skill = request.GET.get('skill')
+    budget_type = request.GET.get('budget_type')
+    min_budget = request.GET.get('min_budget')
+    max_budget = request.GET.get('max_budget')
+    duration = request.GET.get('duration')
+    search = request.GET.get('q')
+    
+    if category:
+        projects = projects.filter(skills_required__category__slug=category)
+    
+    if skill:
+        projects = projects.filter(skills_required__slug=skill)
+    
+    if budget_type:
+        projects = projects.filter(budget_type=budget_type)
+    
+    if min_budget:
+        projects = projects.filter(budget_min__gte=min_budget)
+    
+    if max_budget:
+        projects = projects.filter(budget_max__lte=max_budget)
+    
+    if duration:
+        projects = projects.filter(duration=duration)
+    
+    if search:
+        projects = projects.filter(
+            Q(title__icontains=search) |
+            Q(description__icontains=search) |
+            Q(skills_required__name__icontains=search)
+        ).distinct()
+    
+    # Ordering
+    order = request.GET.get('order', '-created_at')
+    projects = projects.order_by(order)
+    
+    # Pagination
+    paginator = Paginator(projects, 10)
+    page = request.GET.get('page', 1)
+    projects = paginator.get_page(page)
+    
+    context = {
+        'projects': projects,
+        'categories': SkillCategory.objects.all(),
+        'skills': Skill.objects.all(),
+        'current_filters': {
+            'category': category,
+            'skill': skill,
+            'budget_type': budget_type,
+            'min_budget': min_budget,
+            'max_budget': max_budget,
+            'duration': duration,
+            'search': search,
+            'order': order,
+        }
+    }
+    return render(request, 'projects/project_list.html', context)
+
+
+def project_detail(request, pk):
+    """Project detail view with proposal form."""
+    project = get_object_or_404(
+        Project.objects.select_related('client', 'client__user'),
+        pk=pk
+    )
+    
+    # Increment view count
+    project.views_count += 1
+    project.save(update_fields=['views_count'])
+    
+    # Get proposals (only for project owner)
+    proposals = None
+    user_proposal = None
+    
+    if request.user.is_authenticated:
+        profile = request.user.profile
+        
+        if project.client == profile:
+            proposals = project.proposals.select_related(
+                'freelancer', 'freelancer__user', 'freelancer__user__user'
+            ).order_by('-created_at')
+        
+        # Check if user already submitted proposal
+        if hasattr(profile, 'freelancer'):
+            user_proposal = project.proposals.filter(freelancer=profile.freelancer).first()
+    
+    context = {
+        'project': project,
+        'proposals': proposals,
+        'user_proposal': user_proposal,
+        'proposal_form': ProposalForm() if not user_proposal else None,
+    }
+    return render(request, 'projects/project_detail.html', context)
+
+
+@login_required
+def project_create(request):
+    """Create a new project."""
+    profile = request.user.profile
+    
+    if not profile.is_client:
+        messages.error(request, 'Seuls les clients peuvent publier des projets.')
+        return redirect('projects:list')
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST)
+        if form.is_valid():
+            project = form.save(commit=False)
+            project.client = profile
+            project.status = Project.Status.OPEN
+            project.save()
+            form.save_m2m()
+            messages.success(request, 'Projet publie avec succes!')
+            return redirect('projects:detail', pk=project.pk)
+    else:
+        form = ProjectForm()
+    
+    return render(request, 'projects/project_form.html', {'form': form})
+
+
+@login_required
+def project_edit(request, pk):
+    """Edit an existing project."""
+    project = get_object_or_404(Project, pk=pk, client=request.user.profile)
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST, instance=project)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Projet mis a jour!')
+            return redirect('projects:detail', pk=project.pk)
+    else:
+        form = ProjectForm(instance=project)
+    
+    return render(request, 'projects/project_form.html', {'form': form, 'project': project})
+
+
+@login_required
+def submit_proposal(request, pk):
+    """Submit a proposal for a project."""
+    project = get_object_or_404(Project, pk=pk, status=Project.Status.OPEN)
+    profile = request.user.profile
+    
+    if not hasattr(profile, 'freelancer'):
+        messages.error(request, 'Vous devez avoir un profil freelancer pour soumettre une proposition.')
+        return redirect('projects:detail', pk=pk)
+    
+    # Check if already submitted
+    if project.proposals.filter(freelancer=profile.freelancer).exists():
+        messages.warning(request, 'Vous avez deja soumis une proposition pour ce projet.')
+        return redirect('projects:detail', pk=pk)
+    
+    if request.method == 'POST':
+        form = ProposalForm(request.POST)
+        if form.is_valid():
+            proposal = form.save(commit=False)
+            proposal.project = project
+            proposal.freelancer = profile.freelancer
+            proposal.save()
+            messages.success(request, 'Proposition soumise avec succes!')
+            return redirect('projects:detail', pk=pk)
+    
+    return redirect('projects:detail', pk=pk)
+
+
+@login_required
+def accept_proposal(request, project_pk, proposal_pk):
+    """Accept a proposal and create contract."""
+    project = get_object_or_404(Project, pk=project_pk, client=request.user.profile)
+    proposal = get_object_or_404(Proposal, pk=proposal_pk, project=project)
+    
+    if request.method == 'POST':
+        from apps.contracts.models import Contract
+        from datetime import date
+        
+        # Create contract
+        contract = Contract.objects.create(
+            project=project,
+            proposal=proposal,
+            client=project.client,
+            freelancer=proposal.freelancer.user,
+            start_date=date.today(),
+            total_amount=proposal.bid_amount,
+            status=Contract.Status.ACTIVE
+        )
+        
+        # Update statuses
+        proposal.status = Proposal.Status.ACCEPTED
+        proposal.save()
+        
+        project.status = Project.Status.IN_PROGRESS
+        project.save()
+        
+        # Reject other proposals
+        project.proposals.exclude(pk=proposal_pk).update(status=Proposal.Status.REJECTED)
+        
+        messages.success(request, 'Proposition acceptee! Le contrat a ete cree.')
+        return redirect('contracts:detail', pk=contract.pk)
+    
+    return redirect('projects:detail', pk=project_pk)
