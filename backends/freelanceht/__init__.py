@@ -1,1 +1,0 @@
-# FreelanceHT Django Project
