@@ -19,6 +19,15 @@ class CustomLoginView(LoginView):
         return reverse_lazy('accounts:dashboard')
 
 
+def logout_view(request):
+    if request.method == 'POST':
+        logout(request)
+        messages.info(request, 'Vous avez ete deconnecte avec succes.')
+        return redirect('core:home')    
+    return render(request, "accounts/logout.html")
+
+
+
 class CustomLogoutView(LogoutView):
     """Custom logout view."""
     next_page = reverse_lazy('core:home')
