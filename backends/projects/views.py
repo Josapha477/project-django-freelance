@@ -142,7 +142,10 @@ def project_create(request):
 def project_edit(request, pk):
     """Edit an existing project."""
     project = get_object_or_404(Project, pk=pk, client=request.user.profile)
-    
+    if project.status == "in_progress" or project.status == "completed":
+       messages.error(request, "impossible de modifier ce projet")
+       return redirect(f"projects:detail", pk=project.pk)
+
     if request.method == 'POST':
         form = ProjectForm(request.POST, instance=project)
         if form.is_valid():

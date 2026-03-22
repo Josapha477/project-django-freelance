@@ -43,7 +43,8 @@
       <!-- Sub-scores -->
       <div class="space-y-4">
         <label class="block text-sm font-semibold text-gray-700">Critères détaillés</label>
-     
+      <!--  {% for label, name, icon in "Communication,communication,message-circle|Qualité du travail,quality,award|Respect des délais,deadline,clock"|split:'|' %}
+        {% endfor %} -->
 
         <div class="grid grid-cols-3 gap-3">
           <div class="p-4 rounded-xl bg-gray-50 border border-gray-100 text-center">

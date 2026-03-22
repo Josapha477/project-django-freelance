@@ -142,7 +142,10 @@ def project_create(request):
 def project_edit(request, pk):
     """Edit an existing project."""
     project = get_object_or_404(Project, pk=pk, client=request.user.profile)
-    
+    if project.status == "in_progress" or project.status == "completed":
+       message.error(request, "impossible de modifier ce projet")
+       return redirect(f"projects:detail", pk=project.pk)
+
     if request.method == 'POST':
         form = ProjectForm(request.POST, instance=project)
         if form.is_valid():
@@ -190,7 +193,7 @@ def accept_proposal(request, project_pk, proposal_pk):
     proposal = get_object_or_404(Proposal, pk=proposal_pk, project=project)
     
     if request.method == 'POST':
-        from apps.contracts.models import Contract
+        from contracts.models import Contract
         from datetime import date
         
         # Create contract
